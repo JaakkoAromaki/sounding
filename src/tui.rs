@@ -10,7 +10,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Style, Stylize},
+    style::{Style, Color, Stylize},
     symbols::border,
     text::Line,
     widgets::{
@@ -25,6 +25,7 @@ pub struct App {
     list_state: ListState,
     items: Vec<PathBuf>,
     player: Player,
+    current_chosen: Option<PathBuf>,
 }
 
 impl App {
@@ -38,8 +39,7 @@ impl App {
                 .collect::<Vec<PathBuf>>()
         } else {
             Vec::new()
-        }; 
-
+        };
 
         // tämänhetkinen musiikki
         let selected = if items.is_empty() {
@@ -56,6 +56,7 @@ impl App {
             list_state: ListState::default().with_selected(selected),
             items,
             player,
+            current_chosen: None,
         }) 
     }
 
@@ -83,6 +84,7 @@ impl App {
                 if let Some(index) = self.list_state.selected() {
                     if let Some(selected_item) = self.items.get(index) {
                         self.player.play(selected_item)?;
+                        self.current_chosen = self.items.get(index).cloned();
                     }
                 } else {
                     println!("Nothing is currently selected");
@@ -117,24 +119,36 @@ impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
+            .spacing(1)
             .constraints([
-                Constraint::Percentage(50),
-                Constraint::Percentage(50),
+                Constraint::Percentage(30),
+                Constraint::Percentage(30),
             ])
             .split(area);
 
         let items = self
-        .items
-        .iter()
-        .map(|path| {
-            let filename = path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy();
+            .items
+            .iter()
+            .map(|path| {
+                let filename = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("");
 
-            ListItem::new(filename.to_string())
-        })
-        .collect::<Vec<_>>();
+                let title = filename
+                    .split(" [")
+                    .next()
+                    .unwrap_or(filename);
+
+                let mut item = ListItem::new(title);
+
+                if self.current_chosen.as_ref() == Some(path) {
+                    item = item.style(Style::default().fg(Color::Green));
+                }
+
+                item
+            })
+            .collect::<Vec<_>>();
 
         let list = List::new(items)
             .block(
@@ -142,7 +156,11 @@ impl Widget for &mut App {
                     .title(Line::from(" Songs ".bold()).centered())
                     .border_set(border::PLAIN),
             )
-            .highlight_style(Style::default().reversed())
+            .highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .fg(Color::White),
+            ) 
             .highlight_symbol(">> ");
 
         StatefulWidget::render(

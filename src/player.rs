@@ -16,10 +16,22 @@ const SOCKET: &str = "/tmp/my-player.sock";
 
 impl Player {
     pub fn new() -> io::Result<Self> {
+        // Try to connect to existing mpv.
+        if let Ok(socket) = UnixStream::connect(SOCKET) {
+            return Ok(Self { socket });
+        }
+
+        // No mpv running, so start one.
         let _mpv = Command::new("mpv")
-            .args(["--idle=yes", "--no-video", &format!("--input-ipc-server={SOCKET}")])
+            .args([
+                "--idle=yes",
+                "--no-video",
+                "--no-terminal",
+                &format!("--input-ipc-server={SOCKET}"),
+            ])
             .spawn()?;
 
+        // Wait for mpv's socket.
         for _ in 0..50 {
             if let Ok(socket) = UnixStream::connect(SOCKET) {
                 return Ok(Self { socket });
@@ -32,8 +44,7 @@ impl Player {
             io::ErrorKind::TimedOut,
             "mpv socket was not created",
         ))
-    }
-
+    }    
     #[allow(dead_code)]
     pub fn play(&mut self, path: &Path) -> io::Result<()> {
         let command = serde_json::json!({
