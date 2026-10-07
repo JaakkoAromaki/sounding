@@ -1,8 +1,9 @@
 use std::process::Command;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use yt_dlp::Downloader;
 use yt_dlp::client::deps::Libraries;
+use yt_dlp::model::playlist::Playlist;
 
 #[allow(dead_code)]
 fn find_program(name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
@@ -15,17 +16,13 @@ fn find_program(name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
 }
 
 #[allow(dead_code)]
-pub async fn download(url: &str, output: &str, name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let output_dir = PathBuf::from(output);
-
+pub async fn download(url: &str, output: &Path, name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let youtube = find_program("yt-dlp")?;
     let ffmpeg = find_program("ffmpeg")?;
 
-    println!("depencies checked");
-
     let libraries = Libraries::new(youtube, ffmpeg);
 
-    let downloader = Downloader::builder(libraries, output_dir)
+    let downloader = Downloader::builder(libraries, output)
         .build()
         .await?;
 
@@ -36,4 +33,21 @@ pub async fn download(url: &str, output: &str, name: &str) -> Result<(), Box<dyn
         .await?;
 
     Ok(())
+}
+pub async fn search(query: &str) -> Result<Playlist, Box<dyn std::error::Error>> {
+    let youtube = find_program("yt-dlp")?;
+    let ffmpeg = find_program("ffmpeg")?;
+
+    let libraries = Libraries::new(youtube, ffmpeg);
+
+    let downloader = Downloader::builder(libraries, "output")
+        .build()
+        .await?;
+
+
+    let youtube = downloader.youtube_extractor();
+
+    let results = youtube.search(query, 10).await?;
+
+    Ok(results)
 }

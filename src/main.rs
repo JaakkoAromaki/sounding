@@ -19,7 +19,8 @@ enum Commands {
     Config {},
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(err) => err.exit(),
@@ -28,13 +29,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command.unwrap_or(Commands::Main {}) {
 
         Commands::Main {} => {
-                let config = config::Config::load()?;
-                let mut app = tui::App::new(config)?;
+            let config = config::Config::load()?;
+            let mut app = tui::App::new(config)?;
 
-                ratatui::run(|terminal| {
-                    app.run(terminal)
-                })?;
-            }
+            let mut terminal = ratatui::init();
+
+            app.run(&mut terminal).await?;
+
+            ratatui::restore();
+        }
 
         Commands::Config {} => {
             let _ = config::Config::load();
