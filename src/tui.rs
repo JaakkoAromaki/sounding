@@ -78,6 +78,7 @@ impl App {
         let mut player = Player::new()?;
         let current_song = player.get_playing()?.unwrap_or_default();
         let current_song = find_filename(Path::new(&current_song));
+        let current_dir = PathBuf::from(&config.music_directory);
 
         // init
         Ok(Self {
@@ -93,7 +94,7 @@ impl App {
             current_chosen,
             songs_list_open: true,
             current_song,
-            current_dir: PathBuf::from(&config.music_directory),
+            current_dir: current_dir,
             popup_on: false,
             input: String::new(),
             search_results: Vec::new(),
@@ -203,6 +204,27 @@ impl App {
         });
     }
 
+
+    fn reload_song_list(&mut self) -> io::Result<()> {
+        self.items = fs::read_dir(&self.current_dir)?
+            .flatten()
+            .map(|entry| entry.path())
+            .collect::<Vec<PathBuf>>();
+
+        Ok(())
+    }
+
+    
+    fn delete_song(&mut self, path: &Path) -> io::Result<()> {
+        fs::remove_file(path)?;
+        self.notification = Some((
+            format!("Removed {}", path.display()),
+            std::time::Instant::now(),
+        ));
+        Ok(())
+
+    }
+
     fn draw(&mut self, frame: &mut Frame) {
         frame.render_widget(&mut *self, frame.area());
     }
@@ -259,6 +281,7 @@ impl App {
                                         format!("Downloaded {}", name),
                                         std::time::Instant::now(),
                                     ));
+                                    let _ = self.reload_song_list();
                                 }
                                 Err(_e) => {
                                 }
@@ -352,6 +375,14 @@ impl App {
                         ));
                     } else {
                         self.play_queue_item()?;
+                    }
+                }
+            }
+            KeyCode::Char('d') => {
+                if let Some(index) = self.list_state.selected() {
+                    if let Some(selected_item) = self.items.get(index).cloned() {
+                        let _ = self.delete_song(&selected_item);
+                        let _ = self.reload_song_list();
                     }
                 }
             }
